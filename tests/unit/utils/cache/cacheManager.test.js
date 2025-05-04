@@ -2,16 +2,21 @@ const CacheManager = require('../../../../src/utils/cache/cacheManager');
 const logger = require('../../../../src/utils/logger');
 
 jest.mock('../../../../src/utils/logger');
-jest.mock('ioredis', () => jest.fn().mockImplementation(() => {
-    return {
-        on: jest.fn(),
-        get: jest.fn(),
-        set: jest.fn(),
-        del: jest.fn(),
-        flushall: jest.fn(),
-        info: jest.fn()
-    };
-}));
+
+// Mock implementation that will be used for Redis
+const mockRedisImplementation = {
+    on: jest.fn(),
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    flushall: jest.fn(),
+    info: jest.fn()
+};
+
+// Mock the ioredis constructor
+jest.mock('ioredis', () => {
+    return jest.fn().mockImplementation(() => mockRedisImplementation);
+});
 
 describe('CacheManager', () => {
     let cacheManager;
@@ -24,30 +29,30 @@ describe('CacheManager', () => {
     describe('get', () => {
         it('should return the cached value when key exists', async () => {
             const mockValue = { data: 'test' };
-            cacheManager.redis.get.mockResolvedValue(JSON.stringify(mockValue));
+            mockRedisImplementation.get.mockResolvedValue(JSON.stringify(mockValue));
 
             const result = await cacheManager.get('test-key');
 
-            expect(cacheManager.redis.get).toHaveBeenCalledWith('test-key');
+            expect(mockRedisImplementation.get).toHaveBeenCalledWith('test-key');
             expect(result).toEqual(mockValue);
         });
 
         it('should return null when key does not exist', async () => {
-            cacheManager.redis.get.mockResolvedValue(null);
+            mockRedisImplementation.get.mockResolvedValue(null);
 
             const result = await cacheManager.get('non-existent-key');
 
-            expect(cacheManager.redis.get).toHaveBeenCalledWith('non-existent-key');
+            expect(mockRedisImplementation.get).toHaveBeenCalledWith('non-existent-key');
             expect(result).toBeNull();
         });
 
         it('should handle redis errors gracefully', async () => {
             const mockError = new Error('Redis error');
-            cacheManager.redis.get.mockRejectedValue(mockError);
+            mockRedisImplementation.get.mockRejectedValue(mockError);
 
             const result = await cacheManager.get('test-key');
 
-            expect(cacheManager.redis.get).toHaveBeenCalledWith('test-key');
+            expect(mockRedisImplementation.get).toHaveBeenCalledWith('test-key');
             expect(logger.error).toHaveBeenCalled();
             expect(result).toBeNull();
         });
@@ -55,13 +60,13 @@ describe('CacheManager', () => {
 
     describe('set', () => {
         it('should set a value in the cache with TTL', async () => {
-            cacheManager.redis.set.mockResolvedValue('OK');
+            mockRedisImplementation.set.mockResolvedValue('OK');
             const value = { data: 'test' };
             const ttl = 60;
 
             const result = await cacheManager.set('test-key', value, ttl);
 
-            expect(cacheManager.redis.set).toHaveBeenCalledWith(
+            expect(mockRedisImplementation.set).toHaveBeenCalledWith(
                 'test-key',
                 JSON.stringify(value),
                 'EX',
@@ -72,11 +77,11 @@ describe('CacheManager', () => {
 
         it('should handle redis errors gracefully', async () => {
             const mockError = new Error('Redis error');
-            cacheManager.redis.set.mockRejectedValue(mockError);
+            mockRedisImplementation.set.mockRejectedValue(mockError);
 
             const result = await cacheManager.set('test-key', { data: 'test' });
 
-            expect(cacheManager.redis.set).toHaveBeenCalled();
+            expect(mockRedisImplementation.set).toHaveBeenCalled();
             expect(logger.error).toHaveBeenCalled();
             expect(result).toBe(false);
         });
@@ -84,21 +89,21 @@ describe('CacheManager', () => {
 
     describe('del', () => {
         it('should delete a key from the cache', async () => {
-            cacheManager.redis.del.mockResolvedValue(1);
+            mockRedisImplementation.del.mockResolvedValue(1);
 
             const result = await cacheManager.del('test-key');
 
-            expect(cacheManager.redis.del).toHaveBeenCalledWith('test-key');
+            expect(mockRedisImplementation.del).toHaveBeenCalledWith('test-key');
             expect(result).toBe(true);
         });
 
         it('should handle redis errors gracefully', async () => {
             const mockError = new Error('Redis error');
-            cacheManager.redis.del.mockRejectedValue(mockError);
+            mockRedisImplementation.del.mockRejectedValue(mockError);
 
             const result = await cacheManager.del('test-key');
 
-            expect(cacheManager.redis.del).toHaveBeenCalledWith('test-key');
+            expect(mockRedisImplementation.del).toHaveBeenCalledWith('test-key');
             expect(logger.error).toHaveBeenCalled();
             expect(result).toBe(false);
         });
@@ -106,21 +111,21 @@ describe('CacheManager', () => {
 
     describe('clear', () => {
         it('should clear all cache entries', async () => {
-            cacheManager.redis.flushall.mockResolvedValue('OK');
+            mockRedisImplementation.flushall.mockResolvedValue('OK');
 
             const result = await cacheManager.clear();
 
-            expect(cacheManager.redis.flushall).toHaveBeenCalled();
+            expect(mockRedisImplementation.flushall).toHaveBeenCalled();
             expect(result).toBe(true);
         });
 
         it('should handle redis errors gracefully', async () => {
             const mockError = new Error('Redis error');
-            cacheManager.redis.flushall.mockRejectedValue(mockError);
+            mockRedisImplementation.flushall.mockRejectedValue(mockError);
 
             const result = await cacheManager.clear();
 
-            expect(cacheManager.redis.flushall).toHaveBeenCalled();
+            expect(mockRedisImplementation.flushall).toHaveBeenCalled();
             expect(logger.error).toHaveBeenCalled();
             expect(result).toBe(false);
         });
@@ -129,11 +134,11 @@ describe('CacheManager', () => {
     describe('getStats', () => {
         it('should return cache statistics', async () => {
             const mockInfo = 'connected_clients:10\r\nused_memory_human:1GB\r\ntotal_commands_processed:1000\r\n';
-            cacheManager.redis.info.mockResolvedValue(mockInfo);
+            mockRedisImplementation.info.mockResolvedValue(mockInfo);
 
             const result = await cacheManager.getStats();
 
-            expect(cacheManager.redis.info).toHaveBeenCalled();
+            expect(mockRedisImplementation.info).toHaveBeenCalled();
             expect(result).toEqual({
                 connectedClients: 10,
                 usedMemory: '1GB',
@@ -143,11 +148,11 @@ describe('CacheManager', () => {
 
         it('should handle redis errors gracefully', async () => {
             const mockError = new Error('Redis error');
-            cacheManager.redis.info.mockRejectedValue(mockError);
+            mockRedisImplementation.info.mockRejectedValue(mockError);
 
             const result = await cacheManager.getStats();
 
-            expect(cacheManager.redis.info).toHaveBeenCalled();
+            expect(mockRedisImplementation.info).toHaveBeenCalled();
             expect(logger.error).toHaveBeenCalled();
             expect(result).toEqual({
                 connectedClients: 0,
