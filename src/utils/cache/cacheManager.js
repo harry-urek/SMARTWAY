@@ -18,7 +18,7 @@ class CacheManager {
             logger.info(`Connected to Redis at ${config.redis.host}:${config.redis.port}`);
         });
 
-        this.defaultTtl = config.cache?.ttl || 3600; // Default TTL: 1 hour
+        this.defaultTtl = config.cache?.ttl || 3600;
         this.enabled = config.cache?.enabled !== false;
     }
 

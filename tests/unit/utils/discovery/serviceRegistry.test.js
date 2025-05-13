@@ -12,6 +12,8 @@ jest.mock('consul', () => jest.fn().mockImplementation(() => ({
     health: {
         service: jest.fn()
     }
+
+
 })));
 
 describe('ServiceRegistry', () => {
@@ -49,11 +51,17 @@ describe('ServiceRegistry', () => {
             });
             expect(result).toBe(true);
             expect(logger.info).toHaveBeenCalled();
+
+
         });
 
         it('should handle registration errors', async () => {
             const error = new Error('Registration failed');
             serviceRegistry.consul.agent.service.register.mockRejectedValue(error);
+
+
+
+
 
             const serviceId = 'test-service-123';
             const serviceName = 'test-service';
